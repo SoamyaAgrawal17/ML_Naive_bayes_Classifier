@@ -9,68 +9,42 @@ import java.io.InputStreamReader;
 @Slf4j
 public class NaiveBayesClassifier {
 
+    private static final int TRAINING_DATA_SIZE = 451;
+    private static final int TESTING_DATA_SIZE = 150;
+    private static final int TOTAL_PIXELS_IN_AN_IMAGE = 4200;
+    // setting of smooth constant
+    private static final float SMOOTH_K = 1f;
+    private static final String TRAINING_DATA = "/faceDataTrain";
+    private static final String TRAINING_DATA_OUTPUT = "/faceDataTrainLabels";
+    private static final String TESTING_DATA = "/faceDataTest";
+    private static final String TESTING_DATA_OUTPUT = "/faceDataTestLabels";
 
-    private int[] readActualOutput(String fileName) throws IOException {
-        int[] actualOutput = new int[150];
-        BufferedReader br3 = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(fileName)));
-        for (int i = 0; i < 150; i++) {
-            if (br3.read() == '0') {
-                actualOutput[i] = 0;
-            } else {
-                actualOutput[i] = 1;
 
-            }
-            br3.readLine();
-        }
-
-        br3.close();
-        return actualOutput;
-    }
-
-    private int[] readTrainingDataOutput(String fileName) throws IOException {
+    private int[] readOutput(String fileName, int outputSize) throws IOException {
         BufferedReader br1 = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(fileName)));
-        int[] train = new int[451];
-        for (int i = 0; i < 451; i++) {
+        int[] output = new int[outputSize];
+        for (int i = 0; i < outputSize; i++) {
             if (br1.read() == '0') {
-                train[i] = 0;
+                output[i] = 0;
 
             } else {
-                train[i] = 1;
+                output[i] = 1;
 
             }
             br1.readLine();
         }
         br1.close();
-        return train;
+        return output;
     }
+
 
     private int[] getPredictedOutput(float pf, float pnf, char[][] fTest, float[] condSpaceFaceProb,
                                      float[] condHashFaceProb, float[] condSpaceNonProb, float[] condHashNonProb) {
-        int[] predictedOutput = new int[150];
-        double[] max1 = new double[150];
-        double[] max2 = new double[150];
-        for (int i = 0; i < 150; i++) {
-            max1[i] = Math.log(pf);
-            for (int j = 0; j < 4200; j++) {
-                if (fTest[i][j] == ' ') {
-                    max1[i] = max1[i] + Math.log(condSpaceFaceProb[j]);
-                } else if (fTest[i][j] == '#') {
-                    max1[i] = max1[i] + Math.log(condHashFaceProb[j]);
-                }
-            }
-        }
-        for (int i = 0; i < 150; i++) {
-            max2[i] = Math.log(pnf);
-            for (int j = 0; j < 4200; j++) {
-                if (fTest[i][j] == ' ') {
-                    max2[i] = max2[i] + Math.log(condSpaceNonProb[j]);
-                } else if (fTest[i][j] == '#') {
-                    max2[i] = max2[i] + Math.log(condHashNonProb[j]);
-                }
-            }
-        }
-        for (int i = 0; i < 150; i++) {
-            if (max2[i] > max1[i]) {
+        int[] predictedOutput = new int[TESTING_DATA_SIZE];
+        double[] probFace = calculateProbability(pf, condSpaceFaceProb, condHashFaceProb, fTest);
+        double[] probNonFace = calculateProbability(pnf, condSpaceNonProb, condHashNonProb, fTest);
+        for (int i = 0; i < TESTING_DATA_SIZE; i++) {
+            if (probNonFace[i] > probFace[i]) {
                 predictedOutput[i] = 0;
             } else {
                 predictedOutput[i] = 1;
@@ -80,15 +54,30 @@ public class NaiveBayesClassifier {
         return predictedOutput;
     }
 
+    private double[] calculateProbability(float prob, float[] condSpaceProb, float[] condHashProb, char[][] fTest) {
+        double[] probability = new double[TESTING_DATA_SIZE];
+        for (int i = 0; i < TESTING_DATA_SIZE; i++) {
+            probability[i] = Math.log(prob);
+            for (int j = 0; j < TOTAL_PIXELS_IN_AN_IMAGE; j++) {
+                if (fTest[i][j] == ' ') {
+                    probability[i] = probability[i] + Math.log(condSpaceProb[j]);
+                } else if (fTest[i][j] == '#') {
+                    probability[i] = probability[i] + Math.log(condHashProb[j]);
+                }
+            }
+        }
+        return probability;
+    }
 
-    private char[][] readFaceData(String fileName) throws IOException {
+
+    private char[][] readData(String fileName) throws IOException {
         int face = 0;
         int f = 0;
-        char [][] faceData = new char[451][4200];
+        char [][] faceData = new char[TRAINING_DATA_SIZE][TOTAL_PIXELS_IN_AN_IMAGE];
         String sCurrentLine;
         BufferedReader br = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(fileName)));
         while ((sCurrentLine = br.readLine()) != null) {
-            if (f == 4200) {
+            if (f == TOTAL_PIXELS_IN_AN_IMAGE) {
                 f = 0;
                 face++;
             }
@@ -108,7 +97,7 @@ public class NaiveBayesClassifier {
         int fp = 0;
         int fn = 0;
         int tp = 0;
-        for (i = 0; i < 150; i++) {
+        for (i = 0; i < TESTING_DATA_SIZE; i++) {
             if (actualOutput[i] == 0 && predictedOutput[i] == 0) {
                 tn++;
             } else if (actualOutput[i] == 0 && predictedOutput[i] == 1) {
@@ -130,24 +119,16 @@ public class NaiveBayesClassifier {
 
     void detectFace() throws IOException {
 
-        // setting of smoothconstant
-        float smoothk = 1f;
-
         // reading training data file
-        int i;
-        int j;
         // declaring array containing information about pixels of each face
-        char[][] ft = readFaceData("/faceDataTrain");
+        char[][] ft = readData(TRAINING_DATA);
 
         // reading label file to calculate probability of being a face and not being a face
-        int[] train = readTrainingDataOutput("/faceDataTrainLabels");
+        int[] train = readOutput(TRAINING_DATA_OUTPUT, TRAINING_DATA_SIZE);
         int faceCount = 0;
         int nonFaceCount = 0;
-        float pf;
-        float pnf;
 
-
-        for(i=0; i< 451; i++) {
+        for(int i=0; i< TRAINING_DATA_SIZE; i++) {
             if(train[i] == 0) {
                 nonFaceCount++;
             }
@@ -156,57 +137,57 @@ public class NaiveBayesClassifier {
             }
         }
 
-        pf = (float) faceCount / (faceCount + nonFaceCount);
-        pnf = (float) nonFaceCount / (faceCount + nonFaceCount);
+        float pf = (float) faceCount / (faceCount + nonFaceCount);
+        float pnf = (float) nonFaceCount / (faceCount + nonFaceCount);
 
         // now calculating conditional probabilities
-        float[] condHashFaceProb = new float[4200];
-        float[] condSpaceFaceProb = new float[4200];
-        int hashCount;
-        int spaceCount;
-        for (i = 0; i < 4200; i++) {
-            hashCount = 0;
-            spaceCount = 0;
-            for (j = 0; j < 451; j++) {
-                if (ft[j][i] == '#' && train[j] == 1) {
-                    hashCount++;
-                } else if (ft[j][i] == ' ' && train[j] == 1) {
-                    spaceCount++;
-                }
+        float[] condHashFaceProb = new float[TOTAL_PIXELS_IN_AN_IMAGE];
+        float[] condSpaceFaceProb = new float[TOTAL_PIXELS_IN_AN_IMAGE];
+        float[] condHashNonProb = new float[TOTAL_PIXELS_IN_AN_IMAGE];
+        float[] condSpaceNonProb = new float[TOTAL_PIXELS_IN_AN_IMAGE];
+        int hashFaceCount;
+        int spaceFaceCount;
+        int hashNonFaceCount;
+        int spaceNonFaceCount;
+        for (int i = 0; i < TOTAL_PIXELS_IN_AN_IMAGE; i++) {
+            hashFaceCount = 0;
+            spaceFaceCount = 0;
+            hashNonFaceCount = 0;
+            spaceNonFaceCount = 0;
+            for (int j = 0; j < TRAINING_DATA_SIZE; j++) {
+                if(train[j] == 1) {
+                    if(ft[j][i] == '#') {
+                        hashFaceCount++;
+                    } else {
+                        spaceFaceCount++;
+                    }
 
-            }
-            condHashFaceProb[i] = (hashCount + smoothk) / (hashCount + smoothk + spaceCount + smoothk);
-            condSpaceFaceProb[i] = (spaceCount + smoothk) / (hashCount + smoothk + spaceCount + smoothk);
-        }
-
-        float[] condHashNonProb = new float[4200];
-        float[] condSpaceNonProb = new float[4200];
-
-        for (i = 0; i < 4200; i++) {
-            hashCount = 0;
-            spaceCount = 0;
-            for (j = 0; j < 451; j++) {
-                if (ft[j][i] == '#' && train[j] == 0) {
-                    hashCount++;
-                } else if (ft[j][i] == ' ' && train[j] == 0) {
-                    spaceCount++;
+                } else if (train[j] == 0) {
+                    if(ft[j][i] == '#') {
+                        hashNonFaceCount++;
+                    } else {
+                        spaceNonFaceCount++;
+                    }
                 }
             }
-            condHashNonProb[i] = (hashCount + smoothk) / (hashCount + smoothk + spaceCount + smoothk);
-            condSpaceNonProb[i] = (spaceCount + smoothk) / (hashCount + smoothk + spaceCount + smoothk);
+
+            condHashFaceProb[i] = (hashFaceCount + SMOOTH_K) / (hashFaceCount + SMOOTH_K + spaceFaceCount + SMOOTH_K);
+            condSpaceFaceProb[i] = (spaceFaceCount + SMOOTH_K) / (hashFaceCount + SMOOTH_K + spaceFaceCount + SMOOTH_K);
+            condHashNonProb[i] = (hashNonFaceCount + SMOOTH_K) / (hashNonFaceCount + SMOOTH_K + spaceNonFaceCount + SMOOTH_K);
+            condSpaceNonProb[i] = (spaceNonFaceCount + SMOOTH_K) / (hashNonFaceCount + SMOOTH_K + spaceNonFaceCount + SMOOTH_K);
         }
 
         // for testing data
 
         // reading data from testing file
-        char[][] fTest = readFaceData("/faceDataTest");
+        char[][] fTest = readData(TESTING_DATA);
         // test labels
-        int[] actualOutput = readActualOutput("/faceDataTestLabels");
+        int[] actualOutput = readOutput(TESTING_DATA_OUTPUT, TESTING_DATA_SIZE);
         int[] predictedOutput = getPredictedOutput(pf, pnf, fTest, condSpaceFaceProb, condHashFaceProb,
                 condSpaceNonProb, condHashNonProb);
 
         // confusion matrix
-        printConfusionMatrixAndAccuracy(actualOutput, predictedOutput, smoothk);
+        printConfusionMatrixAndAccuracy(actualOutput, predictedOutput, SMOOTH_K);
 
     }
 
