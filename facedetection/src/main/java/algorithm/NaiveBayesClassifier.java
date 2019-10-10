@@ -73,7 +73,7 @@ public class NaiveBayesClassifier {
     private char[][] readData(String fileName) throws IOException {
         int face = 0;
         int f = 0;
-        char [][] faceData = new char[TRAINING_DATA_SIZE][TOTAL_PIXELS_IN_AN_IMAGE];
+        char[][] faceData = new char[TRAINING_DATA_SIZE][TOTAL_PIXELS_IN_AN_IMAGE];
         String sCurrentLine;
         BufferedReader br = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(fileName)));
         while ((sCurrentLine = br.readLine()) != null) {
@@ -88,7 +88,7 @@ public class NaiveBayesClassifier {
             }
         }
         br.close();
-        return  faceData;
+        return faceData;
     }
 
     private void printConfusionMatrixAndAccuracy(int[] actualOutput, int[] predictedOutput, float smoothk) {
@@ -128,11 +128,10 @@ public class NaiveBayesClassifier {
         int faceCount = 0;
         int nonFaceCount = 0;
 
-        for(int i=0; i< TRAINING_DATA_SIZE; i++) {
-            if(train[i] == 0) {
+        for (int i = 0; i < TRAINING_DATA_SIZE; i++) {
+            if (train[i] == 0) {
                 nonFaceCount++;
-            }
-            else {
+            } else {
                 faceCount++;
             }
         }
@@ -155,15 +154,15 @@ public class NaiveBayesClassifier {
             hashNonFaceCount = 0;
             spaceNonFaceCount = 0;
             for (int j = 0; j < TRAINING_DATA_SIZE; j++) {
-                if(train[j] == 1) {
-                    if(ft[j][i] == '#') {
+                if (train[j] == 1) {
+                    if (ft[j][i] == '#') {
                         hashFaceCount++;
                     } else {
                         spaceFaceCount++;
                     }
 
                 } else if (train[j] == 0) {
-                    if(ft[j][i] == '#') {
+                    if (ft[j][i] == '#') {
                         hashNonFaceCount++;
                     } else {
                         spaceNonFaceCount++;
